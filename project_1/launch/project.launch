@@ -1,0 +1,9 @@
+<launch>
+
+	<node name="rosbag" pkg="rosbag" type="play" output="screen" args="/home/nstefanakos/bagfiles/1.bag --clock" />
+
+	<node name="Frame" pkg="frame" type="frame" />
+
+	<node name="Future_Pose" pkg="project_1" type="project" />
+
+</launch>
