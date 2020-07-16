@@ -6,6 +6,7 @@
 # include <geometry_msgs/PoseArray.h>
 # include <cmath>
 # include <vector>
+# include <map_ray_caster/map_ray_caster.h>
 
 double KALMAN_X(double U)
 {
@@ -56,14 +57,54 @@ float vel;
 float vel_param;
 
 ros::Publisher pub_1;
+ros::Publisher pub_2;
 std::vector<float> old_ranges;
 ros::Time old_time;
 geometry_msgs::PoseArray future;
+map_ray_caster::MapRayCaster ray_caster;
+nav_msgs::OccupancyGrid map;
 
 void Callback_1(const sensor_msgs::LaserScan::ConstPtr& msg)
 {
 	sensor_msgs::LaserScan new_msg(*msg);
+
+	// map.header.frame_id = "/hokuyo_base_laser_link";
+	map.header.stamp = ros::Time::now();
+
+	if ( count_1 == 0 )
+	{
+		map.info.map_load_time = ros::Time::now();
+		map.info.resolution = 0.2;
+		map.info.width = 80;
+		map.info.height = 80;
+		map.info.origin.position.x = 8;
+		map.info.origin.position.y = 8;
+		map.info.origin.position.z = 0;
+		map.info.origin.orientation.x = 0.7071066;
+		map.info.origin.orientation.y = -0.7071066;
+		map.info.origin.orientation.z = 0;
+		map.info.origin.orientation.w = 0;
+	}
+
+	map.header.frame_id = "Human";
 	
+
+	for (int i = 0 ; i < (map.info.width*map.info.height); i++)
+	{
+		map.data.push_back(0);
+	}
+
+	sensor_msgs::LaserScan scan;
+   	scan.angle_min = -45*3.14159/180;
+  	scan.angle_max = 45*3.14159/180;
+  	scan.angle_increment = (scan.angle_max - scan.angle_min) / (720 - 1);
+  	scan.range_max = 10;
+  	scan.header = map.header;
+ 	scan.header.frame_id = "laser_frame";
+	ray_caster.laserScanCast(map, scan);
+
+	pub_2.publish(ray_caster);
+
 	if (count_1 == 0)
 	{
 		old_ranges = new_msg.ranges;
@@ -72,6 +113,22 @@ void Callback_1(const sensor_msgs::LaserScan::ConstPtr& msg)
 
 	for (int i = 0 ; i < new_msg.ranges.size(); i++)
 	{
+		float th = new_msg.angle_min + i * new_msg.angle_increment;
+		float x0 = new_msg.ranges[i] * cos(th);
+		float y0 = new_msg.ranges[i] * sin(th);
+		int x;
+		int y;
+
+		x = map.info.width*map.info.height/2 - int(x0/map.info.resolution)*map.info.height - (map.info.width);
+		y = map.info.width/2 - y0/map.info.resolution;
+
+		int k = floor(x+y);
+
+		if (k >= 0 && k < map.data.size())
+		{
+			map.data[k] = 100;
+		}
+
 		if (abs(old_ranges[i] - new_msg.ranges[i]) <= 0.5 || abs(old_ranges[i] - new_msg.ranges[i]) > 10)
 		{    
 			new_msg.ranges[i] = 0;
@@ -191,6 +248,7 @@ void Callback_1(const sensor_msgs::LaserScan::ConstPtr& msg)
 
 
 	future.poses.erase(future.poses.begin(), future.poses.end());
+	map.data.erase(map.data.begin(), map.data.end());
 }
 
 
@@ -203,6 +261,7 @@ int main(int argc, char **argv)
 	ros::Subscriber sub = n.subscribe("/scan", 1000, Callback_1);
 
 	pub_1 = n.advertise<geometry_msgs::PoseArray>("Future_Pose", 1000);
+	pub_2 = n.advertise<map_ray_caster::MapRayCaster>("ray_caster", 1000);
 
 	ros::spin();
 
