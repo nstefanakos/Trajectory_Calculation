@@ -58,6 +58,7 @@ float vel_param;
 
 ros::Publisher pub_1;
 ros::Publisher pub_2;
+ros::Publisher pub_3;
 std::vector<float> old_ranges;
 ros::Time old_time;
 geometry_msgs::PoseArray future;
@@ -125,11 +126,13 @@ void Callback_1(const sensor_msgs::LaserScan::ConstPtr& msg)
 		}
 	}
 
+	pub_3.publish(map);
+
 	sensor_msgs::LaserScan scan;
-   	scan.angle_min = -90*3.14159/180;
-  	scan.angle_max = 90*3.14159/180;
+   	scan.angle_min = -180*3.14159/180;
+  	scan.angle_max = 0*3.14159/180;
   	scan.angle_increment = (scan.angle_max - scan.angle_min) / (720 - 1);
-  	scan.range_max = 10;
+  	scan.range_max = 50;
   	scan.header = map.header;
  	scan.header.frame_id = "/hokuyo_base_laser_link";
 	ray_caster.laserScanCast(map, scan);
@@ -243,6 +246,7 @@ int main(int argc, char **argv)
 
 	pub_1 = n.advertise<geometry_msgs::PoseArray>("Future_Pose", 1000);
 	pub_2 = n.advertise<sensor_msgs::LaserScan>("ray_caster", 1000);
+	pub_3 = n.advertise<nav_msgs::OccupancyGrid>("grid", 1000);
 
 	ros::spin();
 
