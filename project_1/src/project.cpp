@@ -110,8 +110,8 @@ void Callback_1(const sensor_msgs::LaserScan::ConstPtr& msg)
 		int x;
 		int y;
 
-		x = map.info.width*map.info.height/2 - int(x0/map.info.resolution)*map.info.height - (map.info.width);
-		y = map.info.width/2 - y0/map.info.resolution;
+		x = map.info.width*map.info.height/2 - int(-y0/map.info.resolution)*map.info.height - (map.info.width);
+		y = map.info.width/2 + x0/map.info.resolution;
 
 		int k = floor(x+y);
 
@@ -129,8 +129,8 @@ void Callback_1(const sensor_msgs::LaserScan::ConstPtr& msg)
 	pub_3.publish(map);
 
 	sensor_msgs::LaserScan scan;
-   	scan.angle_min = -180*3.14159/180;
-  	scan.angle_max = 0*3.14159/180;
+   	scan.angle_min = -90*3.14159/180;
+  	scan.angle_max = 90*3.14159/180;
   	scan.angle_increment = (scan.angle_max - scan.angle_min) / (720 - 1);
   	scan.range_max = 50;
   	scan.header = map.header;
