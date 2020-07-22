@@ -110,8 +110,8 @@ void Callback_1(const sensor_msgs::LaserScan::ConstPtr& msg)
 		int x;
 		int y;
 
-		x = map.info.width*map.info.height/2 - int(-y0/map.info.resolution)*map.info.height - (map.info.width);
-		y = map.info.width/2 + x0/map.info.resolution;
+		y = map.info.width*map.info.height/2 - int(-y0/map.info.resolution)*map.info.height - (map.info.width);
+		x = map.info.width/2 + x0/map.info.resolution;
 
 		int k = floor(x+y);
 
