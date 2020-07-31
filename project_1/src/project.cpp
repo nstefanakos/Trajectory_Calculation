@@ -2,6 +2,9 @@
 # include "sensor_msgs/LaserScan.h"
 # include "nav_msgs/OccupancyGrid.h"
 # include <tf2/LinearMath/Quaternion.h>
+# include <tf2/LinearMath/Scalar.h>
+# include <tf2_ros/transform_listener.h>
+# include <geometry_msgs/TransformStamped.h>
 # include <visualization_msgs/MarkerArray.h>
 # include <geometry_msgs/PoseArray.h>
 # include <cmath>
@@ -55,6 +58,7 @@ float f_x;
 float f_y;
 float vel;
 float vel_param;
+float orient;
 
 ros::Publisher pub_1;
 ros::Publisher pub_2;
@@ -62,8 +66,12 @@ ros::Publisher pub_3;
 std::vector<float> old_ranges;
 ros::Time old_time;
 geometry_msgs::PoseArray future;
-map_ray_caster::MapRayCaster ray_caster;
+// map_ray_caster::MapRayCaster ray_caster;
 nav_msgs::OccupancyGrid map;
+
+tf2_ros::Buffer tfBuffer;
+geometry_msgs::TransformStamped transformstamped;
+
 
 void Callback_1(const sensor_msgs::LaserScan::ConstPtr& msg)
 {
@@ -110,8 +118,8 @@ void Callback_1(const sensor_msgs::LaserScan::ConstPtr& msg)
 		int x;
 		int y;
 
-		y = map.info.width*map.info.height/2 - int(-y0/map.info.resolution)*map.info.height - (map.info.width);
 		x = map.info.width/2 + x0/map.info.resolution;
+		y = map.info.width*map.info.height/2 - int(-y0/map.info.resolution)*map.info.height - (map.info.width);
 
 		int k = floor(x+y);
 
@@ -124,6 +132,8 @@ void Callback_1(const sensor_msgs::LaserScan::ConstPtr& msg)
 		{    
 			new_msg.ranges[i] = 0;
 		}
+
+ 		orient = atan2((y - old_y), (x - old_x));
 	}
 
 	pub_3.publish(map);
@@ -134,8 +144,33 @@ void Callback_1(const sensor_msgs::LaserScan::ConstPtr& msg)
   	scan.angle_increment = (scan.angle_max - scan.angle_min) / (720 - 1);
   	scan.range_max = 50;
   	scan.header = map.header;
- 	scan.header.frame_id = "/hokuyo_base_laser_link";
-	ray_caster.laserScanCast(map, scan);
+ 	scan.header.frame_id = "Human";
+
+ 	try {
+ 		transformstamped = tfBuffer.lookupTransform("hokuyo_base_laser_link", "Human", ros::Time(0));
+ 	}	
+ 	catch (tf2::TransformException &ex) {
+ 		ROS_WARN("%s", ex.what());
+ 	}
+
+ 	float x_t = transformstamped.transform.translation.x;
+ 	float y_t = transformstamped.transform.translation.y;
+ 	float z_t = transformstamped.transform.translation.z;
+
+ 	tf2Scalar q_x = transformstamped.transform.rotation.x;
+ 	tf2Scalar q_y = transformstamped.transform.rotation.y;
+ 	tf2Scalar q_z = transformstamped.transform.rotation.z;
+ 	tf2Scalar q_w = transformstamped.transform.rotation.w;
+
+ 	tf2::Quaternion qu(q_x, q_y, q_z, q_w);
+
+  	float orient_3 = qu.getAngle();
+
+ 	std::cout << x_t << "\n";
+ 	
+	map_ray_caster::MapRayCaster ray_caster;
+
+	ray_caster.laserScanCast(map, scan, x_t, y_t);
 
 	pub_2.publish(scan);
 
@@ -157,7 +192,6 @@ void Callback_1(const sensor_msgs::LaserScan::ConstPtr& msg)
 		}
 	}
 
-	int i_human = (max+min)/2;
 	float th_1 = new_msg.angle_min + max * new_msg.angle_increment;
 	float th_2 = new_msg.angle_min + min * new_msg.angle_increment;
 	float x_1 = new_msg.ranges[max] * cos(th_1);
@@ -183,9 +217,6 @@ void Callback_1(const sensor_msgs::LaserScan::ConstPtr& msg)
 	{	
 		if (count_2 > 0)
 		{
-			float slope = (y - old_y)/(x - old_x);
-			float orient = atan2((y - old_y), (x - old_x));
-
 			for (float j=0 ; j <= 1; j = j + 0.5)
 			{
 				float old_pos_x = 0;
@@ -243,6 +274,8 @@ int main(int argc, char **argv)
 	ros::NodeHandle n;
 
 	ros::Subscriber sub = n.subscribe("/scan", 1000, Callback_1);
+
+	tf2_ros::TransformListener tfListener(tfBuffer);
 
 	pub_1 = n.advertise<geometry_msgs::PoseArray>("Future_Pose", 1000);
 	pub_2 = n.advertise<sensor_msgs::LaserScan>("ray_caster", 1000);
